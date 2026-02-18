@@ -172,7 +172,17 @@ https://github.com/michaelxmchn/eleme-cloud-phone-automation
 
 ---
 
-## 🆕 新问题：应用内点击后跳转到主页
+## 🆕 新方案：Accessibility Service（长期方案）
+
+**时间**: 2026-02-18 22:12
+
+**文档**: [ACCESSIBILITY_SERVICE_PLAN.md](./ACCESSIBILITY_SERVICE_PLAN.md)
+
+**方案概述**:
+- 开发 Android 无障碍服务 APK
+- 使用 AccessibilityNodeInfo API 操作 UI 元素
+- 彻底绕过 APP 点击检测
+- 预计开发周期: 3-4 周
 
 **测试时间**: 2026-02-18 21:58
 
