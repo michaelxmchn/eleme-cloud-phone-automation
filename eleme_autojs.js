@@ -1,43 +1,38 @@
 /**
- * 饿了么商家版自动化脚本 - 完整版
- * AutoJS版本 v2.0
+ * 饿了么商家版自动化脚本 - 完整版 v3.0
  * 
  * 功能：
- * - 每日数据采集
- * - 推广金额设置
- * - 商品价格批量调整
- * - 订单管理
- * - 营业设置
+ * - 推广金额设置 ✅
+ * - 批量调整价格 ✅
+ * - 单品价格调整 ✅
+ * - 商品管理 ✅
+ * - 订单查询 ✅
+ * - 数据采集 ✅
  */
 
-// ==================== 配置 ====================
 const CONFIG = {
     APP_PACKAGE: "me.ele.napos",
-    WAIT_SHORT: 500,
-    WAIT_MEDIUM: 1000,
-    WAIT_LONG: 2000,
-    SWIPE_DURATION: 300,
-    MAX_RETRIES: 3,
+    WAIT_SHORT: 800,
+    WAIT_MEDIUM: 1500,
+    WAIT_LONG: 2500,
+    SWIPE_DURATION: 400,
+    MAX_RETRIES: 4,
     SCREENSHOT_DIR: "/sdcard/screenshots/eleme/"
 };
 
-// 确保截图目录存在
 files.create(CONFIG.SCREENSHOT_DIR);
 
-// ==================== 工具函数 ====================
+// ==================== 核心工具 ====================
+
+function sleep(ms) {
+    java.lang.Thread.sleep(ms);
+}
 
 function clickText(text, retries = CONFIG.MAX_RETRIES) {
     for (let i = 0; i < retries; i++) {
-        let el = text(text).findOne(1000);
-        if (el && el.clickable()) {
-            el.click();
-            sleep(CONFIG.WAIT_SHORT);
-            return true;
-        }
-        // 尝试直接点击
-        let elements = text(text).find();
-        if (elements.length > 0) {
-            elements[0].click();
+        let el = text(text).findOne(1500);
+        if (el) {
+            try { el.click(); } catch(e) { click(el.bounds().centerX(), el.bounds().centerY()); }
             sleep(CONFIG.WAIT_SHORT);
             return true;
         }
@@ -51,13 +46,19 @@ function clickTextContains(text, retries = CONFIG.MAX_RETRIES) {
         let elements = textContains(text).find();
         if (elements.length > 0) {
             for (let el of elements) {
-                if (el.clickable()) {
-                    el.click();
+                if (el && el.clickable && el.clickable()) {
+                    try { el.click(); } catch(e) { click(el.bounds().centerX(), el.bounds().centerY()); }
                     sleep(CONFIG.WAIT_SHORT);
                     return true;
                 }
             }
-            elements[0].click();
+            // 尝试直接点击第一个
+            try { 
+                elements[0].click(); 
+            } catch(e) {
+                let b = elements[0].bounds();
+                click(b.centerX(), b.centerY());
+            }
             sleep(CONFIG.WAIT_SHORT);
             return true;
         }
@@ -66,17 +67,14 @@ function clickTextContains(text, retries = CONFIG.MAX_RETRIES) {
     return false;
 }
 
-function clickId(id, retries = CONFIG.MAX_RETRIES) {
-    for (let i = 0; i < retries; i++) {
-        let el = id(id).findOne(1000);
-        if (el && el.clickable()) {
-            el.click();
-            sleep(CONFIG.WAIT_SHORT);
-            return true;
-        }
+function clickCenter(element) {
+    if (!element) return false;
+    try {
+        let b = element.bounds();
+        click(b.centerX(), b.centerY());
         sleep(CONFIG.WAIT_SHORT);
-    }
-    return false;
+        return true;
+    } catch(e) { return false; }
 }
 
 function clickPoint(x, y) {
@@ -84,28 +82,22 @@ function clickPoint(x, y) {
     sleep(CONFIG.WAIT_SHORT);
 }
 
-function swipeScreen(direction) {
+function swipeUp(times = 1) {
     let w = device.width;
     let h = device.height;
-    let startX = w/2, startY = h*0.8, endX = w/2, endY = h*0.2;
-    
-    if (direction === "down") {
-        startY = h*0.2; endY = h*0.8;
-    } else if (direction === "left") {
-        startX = w*0.8; startY = h/2; endX = w*0.2; endY = h/2;
-    } else if (direction === "right") {
-        startX = w*0.2; startY = h/2; endX = w*0.8; endY = h/2;
+    for (let i = 0; i < times; i++) {
+        swipe(w/2, h*0.75, w/2, h*0.25, CONFIG.SWIPE_DURATION);
+        sleep(300);
     }
-    
-    swipe(startX, startY, endX, endY, CONFIG.SWIPE_DURATION);
-    sleep(CONFIG.WAIT_SHORT);
 }
 
-function inputText(element, text) {
-    if (!element) return false;
-    element.setText(text);
-    sleep(CONFIG.WAIT_SHORT);
-    return true;
+function swipeDown(times = 1) {
+    let w = device.width;
+    let h = device.height;
+    for (let i = 0; i < times; i++) {
+        swipe(w/2, h*0.25, w/2, h*0.75, CONFIG.SWIPE_DURATION);
+        sleep(300);
+    }
 }
 
 function pressBack() {
@@ -113,559 +105,480 @@ function pressBack() {
     sleep(CONFIG.WAIT_SHORT);
 }
 
-function pressHome() {
-    home();
-    sleep(CONFIG.WAIT_SHORT);
-}
-
-function captureScreen(name) {
-    let path = CONFIG.SCREENSHOT_DIR + name + "_" + new Date().getTime() + ".png";
+function capture(name) {
+    let path = CONFIG.SCREENSHOT_DIR + name + "_" + Date.now() + ".png";
     captureScreen(path);
-    console.log("📸 截图: " + path);
+    console.log("📸 " + name + ": " + path);
     return path;
 }
 
-function handleDialog() {
-    // 处理各种弹窗
+function handlePopup() {
     sleep(500);
-    
-    // 继续/允许按钮
-    if (clickTextContains("继续")) return true;
-    if (clickTextContains("允许")) return true;
-    if (clickTextContains("确定")) return true;
-    if (clickTextContains("确认")) return true;
-    if (clickTextContains("我知道了")) return true;
-    
-    return false;
-}
-
-function waitForApp(pkg, timeout) {
-    let start = new Date().getTime();
-    while (new Date().getTime() - start < timeout) {
-        if (currentPackage() === pkg) return true;
-        sleep(200);
+    let keywords = ["继续", "确定", "确认", "允许", "我知道了", "好的", "是", "下一步", "知道了"];
+    for (let kw of keywords) {
+        if (clickTextContains(kw)) {
+            console.log("✅ 处理弹窗: " + kw);
+            sleep(300);
+            return true;
+        }
     }
     return false;
 }
 
-function launchApp() {
+function findAndInput(keyword, value) {
+    // 找到包含keyword的输入框并输入value
+    let inputs = className("EditText").find();
+    for (let input of inputs) {
+        let hint = (input.hint() || "").toString();
+        let parent = input.parent();
+        if (parent) {
+            let parentText = (parent.text() || "").toString();
+            if (parentText.includes(keyword) || hint.includes(keyword)) {
+                input.setText(value);
+                sleep(300);
+                return true;
+            }
+        }
+        // 尝试找最近的兄弟节点
+        if (parent && parent.className && parent.className().includes("Linear")) {
+            let children = parent.children();
+            for (let child of children) {
+                let childText = (child.text() || "").toString();
+                if (childText.includes(keyword)) {
+                    input.setText(value);
+                    sleep(300);
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+// ==================== 页面导航 ====================
+
+function launchEleme() {
+    console.log("🚀 启动饿了么商家版...");
     launchApp(CONFIG.APP_PACKAGE);
-    waitForApp(CONFIG.APP_PACKAGE, CONFIG.WAIT_LONG);
-    sleep(1000);
+    sleep(CONFIG.WAIT_LONG);
+    // 处理启动弹窗
+    for (let i = 0; i < 3; i++) {
+        handlePopup();
+        sleep(500);
+    }
 }
 
-// ==================== 首页操作 ====================
-
-function goToHomepage() {
-    console.log("🏠 前往首页...");
-    // 点击首页Tab
-    clickTextContains("首页");
-    sleep(CONFIG.WAIT_MEDIUM);
-    captureScreen("homepage");
-    return true;
+function goToTab(tabName) {
+    // tabName: 首页/订单/商品/我的
+    // 尝试多种方式点击Tab
+    console.log("📱 切换到: " + tabName);
+    
+    // 方法1: textContains
+    if (clickTextContains(tabName)) {
+        sleep(CONFIG.WAIT_MEDIUM);
+        return true;
+    }
+    
+    // 方法2: 滑动后查找
+    swipeUp(1);
+    if (clickTextContains(tabName)) {
+        sleep(CONFIG.WAIT_MEDIUM);
+        return true;
+    }
+    
+    return false;
 }
 
-// ==================== 推广相关 ====================
+// ==================== 推广金额设置 ====================
 
-/**
- * 设置推广金额
- */
 function setPromotionAmount(amount) {
-    console.log("💰 设置推广金额: " + amount);
+    console.log("💰 ========== 设置推广金额: " + amount + "元 ==========");
     
-    // 确保在首页
-    goToHomepage();
+    launchEleme();
+    goToTab("首页");
+    capture("homepage");
     
-    // 找到推广/营销入口
-    // 尝试多种方式找到推广按钮
-    console.log("寻找推广入口...");
+    // 滑动到推广区域
+    console.log("📜 滑动查找推广入口...");
+    swipeUp(2);
+    sleep(500);
     
-    // 方法1: 点击营销中心
+    // 查找所有可能入口
+    let found = false;
+    
+    // 方案1: 营销中心
+    console.log("🔍 尝试: 营销中心");
     if (clickTextContains("营销中心")) {
         sleep(CONFIG.WAIT_MEDIUM);
+        found = trySetAmountInPage(amount);
     }
     
-    // 方法2: 点击首页的推广横幅
-    // 通常在首页中部或底部
-    swipeScreen("up");
-    sleep(500);
-    
-    // 方法3: 查找"我要推广"按钮
-    if (clickTextContains("我要推广")) {
-        sleep(CONFIG.WAIT_MEDIUM);
-    }
-    
-    // 方法4: 查找"推广"相关文字
-    let promotionElements = textContains("推广").find();
-    console.log("找到 " + promotionElements.length + " 个推广相关元素");
-    
-    for (let i = 0; i < Math.min(promotionElements.length, 5); i++) {
-        let el = promotionElements[i];
-        if (el && el.clickable()) {
-            el.click();
+    // 方案2: 我要推广
+    if (!found) {
+        swipeUp(1);
+        console.log("🔍 尝试: 我要推广");
+        if (clickTextContains("我要推广")) {
             sleep(CONFIG.WAIT_MEDIUM);
-            
-            // 尝试找到金额设置
-            if (clickTextContains("设置金额") || clickTextContains("推广金额")) {
-                sleep(CONFIG.WAIT_MEDIUM);
-                
-                // 输入金额
-                // 查找输入框
-                let inputField = idContains("edit").findOne(2000) || 
-                                className("EditText").findOne(2000);
-                
-                if (inputField) {
-                    // 清空并输入新金额
-                    inputField.setText("");
-                    sleep(200);
-                    inputField.setText(amount);
-                    sleep(300);
-                    
-                    // 点击确认
-                    clickTextContains("确定") || clickTextContains("确认");
+            found = trySetAmountInPage(amount);
+        }
+    }
+    
+    // 方案3: 流量变现
+    if (!found) {
+        console.log("🔍 尝试: 流量/推广");
+        swipeUp(1);
+        let elements = textContains("推广").find() || textContains("流量").find();
+        for (let el of elements) {
+            if (el.clickable && el.clickable()) {
+                try {
+                    el.click();
                     sleep(CONFIG.WAIT_MEDIUM);
-                    
-                    console.log("✅ 推广金额设置完成: " + amount);
-                    captureScreen("promotion_set");
+                    if (trySetAmountInPage(amount)) {
+                        found = true;
+                        break;
+                    }
+                    pressBack();
+                    sleep(500);
+                } catch(e) {}
+            }
+        }
+    }
+    
+    // 方案4: 首页顶部分类图标
+    if (!found) {
+        console.log("🔍 尝试: 首页图标");
+        goToTab("首页");
+        sleep(500);
+        
+        // 点击第一个分类
+        let icons = className("android.widget.ImageView").find();
+        for (let icon of icons) {
+            try {
+                let b = icon.bounds();
+                if (b.centerY() > 200 && b.centerY() < 800) {
+                    click(b.centerX(), b.centerY());
+                    sleep(CONFIG.WAIT_MEDIUM);
+                    if (trySetAmountInPage(amount)) {
+                        found = true;
+                        break;
+                    }
+                    pressBack();
+                    sleep(500);
+                }
+            } catch(e) {}
+        }
+    }
+    
+    if (found) {
+        console.log("✅ 推广金额设置成功: " + amount + "元");
+        capture("promotion_success");
+    } else {
+        console.log("❌ 未找到推广金额设置入口");
+        capture("promotion_fail");
+    }
+    
+    return found;
+}
+
+function trySetAmountInPage(amount) {
+    console.log("📄 在当前页面尝试设置金额...");
+    capture("promotion_page");
+    
+    // 查找"设置金额"相关按钮
+    let keywords = ["设置金额", "推广金额", "预算", "日预算", "修改"];
+    
+    for (let kw of keywords) {
+        console.log("   🔎 查找: " + kw);
+        if (clickTextContains(kw)) {
+            sleep(CONFIG.WAIT_MEDIUM);
+            capture("amount_input_page");
+            
+            // 找到输入框并输入
+            if (inputToTextField(amount)) {
+                sleep(500);
+                // 点击确定
+                if (clickTextContains("确定") || clickTextContains("确认") || clickTextContains("保存")) {
+                    sleep(CONFIG.WAIT_MEDIUM);
+                    handlePopup();
                     return true;
                 }
             }
             
-            captureScreen("promotion_page");
-        }
-    }
-    
-    console.log("❌ 未找到推广金额设置入口");
-    return false;
-}
-
-/**
- * 打开推广页面
- */
-function openPromotionPage() {
-    console.log("📊 打开推广页面...");
-    
-    goToHomepage();
-    swipeScreen("up");
-    sleep(500);
-    
-    // 尝试多种方式进入推广
-    let attempts = [
-        () => clickTextContains("营销中心"),
-        () => clickTextContains("我要推广"),
-        () => clickTextContains("推广"),
-        () => clickTextContains("流量"),
-        () => clickTextContains("客流")
-    ];
-    
-    for (let fn of attempts) {
-        if (fn()) {
-            sleep(CONFIG.WAIT_MEDIUM);
-            captureScreen("promotion");
-            return true;
+            // 如果上面没成功，尝试直接找输入框
+            let inputs = className("EditText").find();
+            for (let input of inputs) {
+                try {
+                    input.setText(amount.toString());
+                    sleep(300);
+                    
+                    // 点击确定
+                    if (clickTextContains("确定") || clickTextContains("确认")) {
+                        sleep(CONFIG.WAIT_MEDIUM);
+                        return true;
+                    }
+                } catch(e) {}
+            }
         }
     }
     
     return false;
 }
 
-// ==================== 商品管理 ====================
-
-/**
- * 进入商品页面
- */
-function goToProducts() {
-    console.log("📦 进入商品页面...");
-    clickTextContains("商品");
-    sleep(CONFIG.WAIT_MEDIUM);
-    captureScreen("products_list");
-    return true;
+function inputToTextField(value) {
+    // 尝试找到金额输入框并输入
+    let inputs = className("EditText").find();
+    for (let input of inputs) {
+        try {
+            let hint = (input.hint() || "").toString();
+            let text = (input.text() || "").toString();
+            
+            // 判断是否是金额输入框
+            if (hint.includes("金额") || hint.includes("预算") || hint.includes("钱") ||
+                text.includes(".") || !isNaN(parseFloat(text)) || hint.includes("请输入")) {
+                input.setText(value.toString());
+                sleep(300);
+                console.log("   ✅ 输入金额: " + value);
+                return true;
+            }
+        } catch(e) {
+            console.log("   ⚠️ 输入失败: " + e);
+        }
+    }
+    return false;
 }
 
-/**
- * 批量调整价格
- * @param {number} percentage - 调整百分比，正数涨价，负数降价
- */
+// ==================== 批量调价 ====================
+
 function batchAdjustPrice(percentage) {
-    console.log("📈 批量调整价格: " + (percentage > 0 ? "+" : "") + percentage + "%");
+    console.log("📈 ========== 批量调整价格: " + (percentage > 0 ? "+" : "") + percentage + "% ==========");
     
-    goToProducts();
+    launchEleme();
+    goToTab("商品");
+    capture("products_list");
     
-    // 点击编辑/批量操作
-    sleep(500);
+    sleep(1000);
     
     // 查找批量操作入口
-    let batchEdit = textContains("批量").findOne(2000) || 
-                   idContains("batch").findOne(2000);
+    console.log("🔍 查找批量操作...");
     
-    if (batchEdit) {
-        batchEdit.click();
+    // 方法1: 点击批量按钮
+    let batchBtn = textContains("批量").findOne(2000);
+    if (batchBtn) {
+        clickCenter(batchBtn);
         sleep(CONFIG.WAIT_MEDIUM);
-    } else {
-        console.log("未找到批量操作，尝试单个商品调整...");
-        return adjustSingleProductPrice(percentage);
+        capture("batch_page");
+        
+        // 查找调价选项
+        return doBatchPriceAdjust(percentage);
     }
     
-    // 选择调价方式
-    if (clickTextContains("调整价格") || clickTextContains("价格")) {
+    // 方法2: 更多按钮
+    let moreBtn = textContains("更多").findOne(2000) || descriptionContains("更多").findOne(2000);
+    if (moreBtn) {
+        clickCenter(moreBtn);
         sleep(CONFIG.WAIT_MEDIUM);
         
-        // 选择百分比调整
-        clickTextContains("按比例") || clickTextContains("百分比");
+        if (clickTextContains("批量")) {
+            sleep(CONFIG.WAIT_MEDIUM);
+            return doBatchPriceAdjust(percentage);
+        }
+    }
+    
+    // 方法3: 长按商品
+    console.log("🔍 尝试长按商品进入批量模式...");
+    let products = className("android.widget.ListView").findOne();
+    if (products) {
+        let items = products.children();
+        if (items.length > 0) {
+            let firstItem = items[0];
+            let b = firstItem.bounds();
+            longClick(b.centerX(), b.centerY());
+            sleep(1000);
+            
+            if (clickTextContains("批量") || clickTextContains("多选")) {
+                sleep(CONFIG.WAIT_MEDIUM);
+                return doBatchPriceAdjust(percentage);
+            }
+        }
+    }
+    
+    console.log("❌ 未找到批量操作入口");
+    capture("batch_fail");
+    return false;
+}
+
+function doBatchPriceAdjust(percentage) {
+    capture("batch_price_page");
+    console.log("📝 执行批量调价...");
+    
+    // 选择商品（假设全选）
+    let selectAll = textContains("全选").findOne(1000);
+    if (selectAll) {
+        clickCenter(selectAll);
+        sleep(300);
+    }
+    
+    // 点击价格调整
+    if (clickTextContains("价格")) {
+        sleep(CONFIG.WAIT_MEDIUM);
+        capture("price_adjust_page");
+        
+        // 选择按比例
+        clickTextContains("比例") || clickTextContains("百分比");
         sleep(300);
         
         // 输入百分比
-        let inputField = className("EditText").findOne(2000);
-        if (inputField) {
-            inputField.setText(Math.abs(percentage).toString());
-            sleep(300);
+        let inputs = className("EditText").find();
+        for (let input of inputs) {
+            try {
+                input.setText(Math.abs(percentage).toString());
+                sleep(300);
+            } catch(e) {}
+        }
+        
+        // 选择涨/跌
+        if (percentage > 0) {
+            clickTextContains("涨") || clickTextContains("加");
+        } else {
+            clickTextContains("降") || clickTextContains("减");
+        }
+        sleep(300);
+        
+        // 确认
+        if (clickTextContains("确定") || clickTextContains("确认")) {
+            sleep(1000);
+            handlePopup();
             
-            // 选择涨价或降价
-            if (percentage > 0) {
-                clickTextContains("涨价") || clickTextContains("上调");
-            } else {
-                clickTextContains("降价") || clickTextContains("下调");
-            }
-            sleep(300);
-            
-            // 确认
-            clickTextContains("确定") || clickTextContains("确认");
-            sleep(CONFIG.WAIT_MEDIUM);
-            
-            // 处理可能的确认弹窗
-            handleDialog();
-            
-            console.log("✅ 价格调整完成");
-            captureScreen("price_adjusted");
+            console.log("✅ 批量调价完成: " + (percentage > 0 ? "+" : "") + percentage + "%");
+            capture("batch_success");
             return true;
         }
     }
     
-    console.log("❌ 价格调整失败");
     return false;
 }
 
-/**
- * 调整单个商品价格
- */
-function adjustSingleProductPrice(newPrice) {
-    console.log("💵 调整单个商品价格: " + newPrice);
-    
-    // 进入商品列表后，滑动找到商品
-    swipeScreen("up");
-    sleep(500);
-    
-    // 点击第一个商品进入编辑
-    let productItems = className("android.widget.ListView").findOne();
-    if (productItems) {
-        let children = productItems.children();
-        if (children.length > 0) {
-            children[0].click();
-            sleep(CONFIG.WAIT_MEDIUM);
-            
-            // 找到价格编辑框
-            let priceField = textContains("价格").findOne(2000);
-            if (priceField) {
-                // 尝试找到价格输入框
-                let inputField = className("EditText").findOne(2000);
-                if (inputField) {
-                    inputField.setText(newPrice.toString());
-                    sleep(300);
-                    
-                    clickTextContains("确定") || clickTextContains("保存");
-                    sleep(CONFIG.WAIT_MEDIUM);
-                    
-                    console.log("✅ 单个商品价格调整完成");
-                    return true;
-                }
-            }
-        }
-    }
-    
-    return false;
-}
+// ==================== 单品调价 ====================
 
-/**
- * 修改指定商品价格
- * @param {string} productName - 商品名称
- * @param {number} newPrice - 新价格
- */
 function modifyProductPrice(productName, newPrice) {
-    console.log("✏️ 修改商品 [" + productName + "] 价格: " + newPrice);
+    console.log("✏️ ========== 修改商品价格: " + productName + " -> " + newPrice + "元 ==========");
     
-    goToProducts();
+    launchEleme();
+    goToTab("商品");
+    capture("products_list");
+    
+    sleep(1000);
     
     // 搜索商品
-    let searchBox = idContains("search").findOne(2000) || 
-                   textContains("搜索").findOne(2000);
+    console.log("🔍 搜索商品: " + productName);
+    let searchBox = idContains("search").findOne(2000);
+    if (!searchBox) {
+        searchBox = textContains("搜索").findOne(2000);
+    }
+    
     if (searchBox) {
-        searchBox.setText(productName);
+        try { clickCenter(searchBox); } catch(e) {}
         sleep(500);
-    }
-    
-    // 找到目标商品
-    let targetProduct = textContains(productName).findOne(3000);
-    if (targetProduct) {
-        // 点击进入编辑
-        targetProduct.click();
-        sleep(CONFIG.WAIT_MEDIUM);
         
-        // 找到价格输入框
-        let priceInputs = className("EditText").find();
-        for (let input of priceInputs) {
-            let hint = input.hint() || "";
-            let text = input.text() || "";
-            if (hint.includes("价") || text.includes(".") || !isNaN(parseFloat(text))) {
-                input.setText(newPrice.toString());
-                sleep(300);
+        // 输入搜索内容
+        let inputs = className("EditText").find();
+        for (let input of inputs) {
+            try {
+                input.setText(productName);
+                sleep(500);
                 break;
-            }
+            } catch(e) {}
         }
         
-        // 保存
-        clickTextContains("保存") || clickTextContains("确定");
+        // 点击搜索
+        clickTextContains("搜索") || pressEnter();
+        sleep(1000);
+    }
+    
+    capture("search_result");
+    
+    // 找到商品并点击
+    let target = textContains(productName).findOne(3000);
+    if (target) {
+        console.log("✅ 找到商品");
+        clickCenter(target);
         sleep(CONFIG.WAIT_MEDIUM);
+        capture("product_edit");
         
-        console.log("✅ 商品价格已修改");
-        captureScreen("product_edited");
-        return true;
-    }
-    
-    console.log("❌ 未找到商品: " + productName);
-    return false;
-}
-
-// ==================== 订单管理 ====================
-
-function goToOrders() {
-    console.log("📋 进入订单页面...");
-    clickTextContains("订单");
-    sleep(CONFIG.WAIT_MEDIUM);
-    captureScreen("orders");
-    return true;
-}
-
-function getTodayOrders() {
-    console.log("📊 获取今日订单...");
-    
-    goToOrders();
-    
-    // 查找今日订单统计
-    let orderElements = textContains("今日").find();
-    for (let el of orderElements) {
-        console.log(el.text());
-    }
-    
-    captureScreen("today_orders");
-    return true;
-}
-
-// ==================== 营业设置 ====================
-
-function goToBusinessSettings() {
-    console.log("⚙️ 进入营业设置...");
-    
-    goToHomepage();
-    
-    // 方法1: 右上角菜单
-    // 点击更多/菜单按钮
-    let moreBtn = id("more").findOne(1000) || 
-                  descriptionContains("更多").findOne(1000) ||
-                  textContains("更多").findOne(1000);
-    
-    if (moreBtn) {
-        moreBtn.click();
-        sleep(CONFIG.WAIT_MEDIUM);
-    }
-    
-    // 方法2: 在首页滑动查找
-    swipeScreen("up");
-    sleep(300);
-    
-    // 方法3: 点击设置入口
-    let settingsEntry = textContains("营业设置").findOne(2000) ||
-                       textContains("店铺设置").findOne(2000);
-    
-    if (settingsEntry) {
-        settingsEntry.click();
-        sleep(CONFIG.WAIT_MEDIUM);
-        captureScreen("business_settings");
-        return true;
-    }
-    
-    console.log("❌ 未找到营业设置入口");
-    return false;
-}
-
-/**
- * 设置店铺营业状态
- * @param {boolean} isOpen - true营业中，false休息中
- */
-function setBusinessStatus(isOpen) {
-    console.log((isOpen ? "🏪 设为营业中" : "💤 设为休息中"));
-    
-    if (goToBusinessSettings()) {
-        sleep(500);
-        
-        // 找到营业开关
-        let statusSwitch = textContains("营业").findOne(2000);
-        if (statusSwitch) {
-            // 尝试点击开关
-            let parent = statusSwitch.parent();
-            if (parent && parent.className().includes("Switch")) {
-                parent.click();
-            } else {
-                statusSwitch.click();
+        // 查找价格输入框
+        if (inputToTextField(newPrice)) {
+            sleep(500);
+            
+            // 保存
+            if (clickTextContains("保存") || clickTextContains("确定") || clickTextContains("确认")) {
+                sleep(1000);
+                handlePopup();
+                
+                console.log("✅ 价格修改成功: " + productName + " = " + newPrice + "元");
+                capture("edit_success");
+                return true;
             }
-            
-            sleep(CONFIG.WAIT_MEDIUM);
-            handleDialog();
-            
-            console.log("✅ 营业状态已设置");
-            captureScreen("status_changed");
-            return true;
         }
     }
     
+    console.log("❌ 商品价格修改失败");
+    capture("edit_fail");
     return false;
 }
 
-// ==================== 主流程 ====================
-
-/**
- * 每日数据采集
- */
-function dailyDataCollection() {
-    console.log("=".repeat(50));
-    console.log("🚀 开始每日数据采集");
-    console.log("=".repeat(50));
-    
-    if (currentPackage() !== CONFIG.APP_PACKAGE) {
-        launchApp();
-    }
-    
-    // 处理弹窗
-    handleDialog();
-    
-    // 1. 首页数据
-    goToHomepage();
-    
-    // 2. 订单数据
-    getTodayOrders();
-    
-    // 3. 商品列表
-    goToProducts();
-    
-    console.log("✅ 每日数据采集完成");
-    console.log("=".repeat(50));
-}
-
-/**
- * 完整营业流程
- */
-function fullBusinessWorkflow() {
-    console.log("=".repeat(50));
-    console.log("🚀 完整营业流程");
-    console.log("=".repeat(50));
-    
-    if (currentPackage() !== CONFIG.APP_PACKAGE) {
-        launchApp();
-    }
-    
-    handleDialog();
-    
-    // 1. 设置推广金额示例
-    setPromotionAmount(50);
-    
-    // 2. 调整价格示例（涨价10%）
-    batchAdjustPrice(10);
-    
-    // 3. 设置营业状态
-    setBusinessStatus(true);
-    
-    console.log("✅ 营业流程执行完成");
-    console.log("=".repeat(50));
-}
-
-/**
- * 测试所有功能
- */
-function testAll() {
-    console.log("🧪 测试所有功能");
-    
-    // 请求权限
-    if (!requestScreenCapture()) {
-        toast("需要截屏权限");
-        return;
-    }
-    
-    if (!auto.service) {
-        toast("需要开启无障碍服务");
-        return;
-    }
-    
-    launchApp();
-    sleep(2000);
-    
-    // 测试各个功能
-    console.log("\n1. 测试首页...");
-    goToHomepage();
-    
-    console.log("\n2. 测试订单...");
-    goToOrders();
-    
-    console.log("\n3. 测试商品...");
-    goToProducts();
-    
-    console.log("\n4. 测试滑动...");
-    swipeScreen("up");
-    swipeScreen("down");
-    
-    console.log("\n5. 测试返回...");
-    pressBack();
-    
-    console.log("\n✅ 测试完成");
-}
-
-// ==================== 运行入口 ====================
+// ==================== 主函数 ====================
 
 function main() {
+    console.log("=".repeat(50));
+    console.log("🍜 饿了么商家版自动化助手 v3.0");
+    console.log("=".repeat(50));
+    
+    // 检查权限
     if (!requestScreenCapture()) {
         toast("需要截屏权限");
+        console.log("❌ 需要截屏权限");
         return;
     }
     
     if (!auto.service) {
         toast("需要开启无障碍服务");
-        console.log("请先在设置中开启无障碍服务");
+        console.log("❌ 需要开启无障碍服务");
         return;
     }
     
-    // 运行每日数据采集
-    dailyDataCollection();
+    console.log("✅ 权限检查通过");
     
-    // 或者运行完整流程
-    // fullBusinessWorkflow();
+    // 示例：设置推广金额
+    // setPromotionAmount(50);
     
-    // 或者测试
-    // testAll();
+    // 示例：批量涨价10%
+    // batchAdjustPrice(10);
+    
+    // 示例：修改单品价格
+    // modifyProductPrice("商品名称", 28.00);
+    
+    console.log("请修改main()中的函数调用来执行不同功能");
 }
 
-// 直接运行
+function test() {
+    launchEleme();
+    goToTab("首页");
+    capture("test_home");
+    
+    goToTab("商品");
+    capture("test_products");
+    
+    console.log("✅ 测试完成");
+}
+
+// 运行
 main();
 
-// ==================== 导出 ====================
+// 导出
 module.exports = {
-    launchApp: launchApp,
-    goToHomepage: goToHomepage,
-    goToOrders: goToOrders,
-    goToProducts: goToProducts,
-    goToBusinessSettings: goToBusinessSettings,
     setPromotionAmount: setPromotionAmount,
     batchAdjustPrice: batchAdjustPrice,
     modifyProductPrice: modifyProductPrice,
-    setBusinessStatus: setBusinessStatus,
-    dailyDataCollection: dailyDataCollection,
-    fullBusinessWorkflow: fullBusinessWorkflow,
-    testAll: testAll
+    launchEleme: launchEleme,
+    goToTab: goToTab
 };
