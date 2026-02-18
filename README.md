@@ -43,7 +43,10 @@ adb shell sendevent /dev/input/event0 0 0 0     # SYN_REPORT
 ```
 
 ### 方案3：Accessibility Service（推荐）
-编写Android无障碍服务APK，使用`AccessibilityNodeInfo.performAction()`执行点击，可以绕过APP检测。
+
+编写 Android 无障碍服务 APK，使用 `AccessibilityNodeInfo.performAction()` 执行点击，可以绕过 APP 检测。
+
+**详细方案**: [ACCESSIBILITY_SERVICE_PLAN.md](./ACCESSIBILITY_SERVICE_PLAN.md)
 
 ### 方案4：OCR + 坐标点击
 1. 截图
