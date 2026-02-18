@@ -1,85 +1,142 @@
-# 饿了么商家版云手机ADB操作
+# 饿了么商家版云手机自动化
 
-通过ADB控制云手机操作饿了么商家版APP时，遇到操作限制问题。
+## 方案架构
 
-## 测试结果
+```
+┌─────────────────┐      HTTP API       ┌─────────────────┐
+│   AI 助手       │ ──────────────────▶ │  API 服务器     │
+│ (OpenClaw)     │                     │ (eleme_api)     │
+└─────────────────┘                     └────────┬────────┘
+                                                 │
+                                          ADB 命令
+                                                 │
+                                                 ▼
+                                         ┌─────────────────┐
+                                         │   云手机        │
+                                         │ (多多云)        │
+                                         └─────────────────┘
+```
 
-### ✅ 正常工作
-- 连接设备
-- 截图
-- 部分点击（底部导航）
-- 滑动
-- 返回键
-
-### ❌ 被限制的操作
-- uiautomator dump（返回空结构）
-- 右上角菜单点击
-- 应用宝下载按钮
-
-## 解决方案
-
-### 已创建的脚本
+## 项目文件
 
 | 文件 | 说明 |
 |------|------|
-| `eleme_controller.py` | 基础控制器 |
-| `eleme_ocr_controller.py` | OCR识别版 |
-| `eleme_sendevent_controller.py` | sendevent底层方案 |
+| `eleme_api_server.py` | API服务器 - AI通过HTTP控制 |
+| `eleme_ai_client.py` | AI客户端 - 封装API调用 |
+| `eleme_autojs.js` | AutoJS脚本 - 无障碍服务自动化 |
+| `AUTOJS_GUIDE.md` | AutoJS使用指南 |
 
-## 解决方案说明
+## 快速开始
 
-### 方案1：motionevent 点击
-```bash
-adb shell input motionevent DOWN X Y
-adb shell input motionevent UP X Y
-```
+### 1. 启动API服务器
 
-### 方案2：sendevent 底层事件
-```bash
-adb shell sendevent /dev/input/event0 3 53 X    # ABS_MT_POSITION_X
-adb shell sendevent /dev/input/event0 3 54 Y    # ABS_MT_POSITION_Y
-adb shell sendevent /dev/input/event0 1 330 1   # BTN_TOUCH_DOWN
-adb shell sendevent /dev/input/event0 0 0 0     # SYN_REPORT
-```
-
-### 方案3：Accessibility Service（推荐）
-
-编写 Android 无障碍服务 APK，使用 `AccessibilityNodeInfo.performAction()` 执行点击，可以绕过 APP 检测。
-
-**详细方案**: [ACCESSIBILITY_SERVICE_PLAN.md](./ACCESSIBILITY_SERVICE_PLAN.md)
-
-### 方案4：OCR + 坐标点击
-1. 截图
-2. OCR识别文字位置
-3. 计算坐标并点击
-
-## 依赖安装
+在连接云手机的电脑上运行：
 
 ```bash
-# OCR依赖
-pip install pytesseract pillow
-
-# Tesseract OCR
-sudo apt install tesseract-ocr tesseract-ocr-chi-sim
+python3 eleme_api_server.py
 ```
 
-## 使用方法
+服务地址：`http://localhost:5000`
 
-```bash
-# 运行控制器
-python3 eleme_controller.py
-python3 eleme_ocr_controller.py
+### 2. AI调用示例
+
+```python
+from eleme_ai_client import ElemeAI
+
+client = ElemeAI()
+
+# 截图
+client.screenshot()
+
+# 点击坐标 (540, 960)
+client.click(540, 960)
+
+# 滑动
+client.swipe("up")
+
+# 返回
+client.back()
 ```
 
-## 核心问题分析
+### 3. HTTP API调用
 
-某些按钮点击无效的原因：
-1. **APP防自动化**：饿了么/应用宝内置检测机制
-2. **敏感区域保护**：下载按钮、设置菜单等被保护
-3. **云手机限制**：某些云手机的ADB实现有阉割
+```
+# 截图
+curl http://localhost:5000/api/screenshot
 
-## 后续方案
+# 点击
+curl "http://localhost:5000/api/click?x=540&y=960"
 
-1. **尝试Accessibility Service APK** - 需要开发Android应用
-2. **使用官方API** - open.ele.me 需要企业资质
-3. **OCR+人工确认** - 半自动方案
+# 滑动
+curl "http://localhost:5000/api/swipe?direction=up&times=1"
+
+# 状态
+curl http://localhost:5000/api/status
+```
+
+## API接口清单
+
+### 基础操作
+
+| 接口 | 说明 | 示例 |
+|------|------|------|
+| `/api/connect` | 连接云手机 | - |
+| `/api/screenshot` | 截图 | 返回base64图片 |
+| `/api/click?x=&y=` | 点击坐标 | `/api/click?x=540&y=960` |
+| `/api/swipe?direction=&times=` | 滑动 | `/api/swipe?direction=up&times=1` |
+| `/api/back` | 返回 | - |
+| `/api/home` | 主页 | - |
+| `/api/text?text=` | 输入文字 | `/api/text?text=hello` |
+| `/api/launch` | 启动APP | `/api/launch?package=me.ele.napos` |
+
+### 状态查询
+
+| 接口 | 说明 |
+|------|------|
+| `/api/status` | 设备状态、屏幕尺寸、当前APP |
+
+## AI控制流程
+
+```
+AI收到用户指令
+     │
+     ▼
+解析指令 (点击/滑动/截图)
+     │
+     ▼
+调用HTTP API
+     │
+     ▼
+API服务器执行ADB命令
+     │
+     ▼
+云手机执行操作
+     │
+     ▼
+返回结果给AI
+     │
+     ▼
+AI返回文字/截图给用户
+```
+
+## AutoJS补充
+
+对于需要无障碍服务的复杂操作（如批量调价），可以使用AutoJS脚本：
+
+1. 在云手机上安装AutoJS
+2. 导入`eleme_autojs.js`
+3. 运行脚本
+
+## 部署架构
+
+```
+另一台电脑(云手机)
+       │
+       │ 运行 eleme_api_server.py
+       ▼
+   HTTP API
+       │
+       │ AI调用
+       ▼
+   OpenClaw (你的AI助手)
+```
