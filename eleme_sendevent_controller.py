@@ -41,7 +41,7 @@ class SendEventController:
     
     def sendevent_tap(self, x, y):
         """使用 sendevent 发送点击事件"""
-        print(f"👆 sendevent点击: ({x}, {y})")
+        print(f"[SEND] sendevent tap: ({x}, {y})")
         
         # 将坐标转换为事件
         # 这是更底层的触摸事件发送方式
@@ -69,7 +69,7 @@ class SendEventController:
     
     def tap(self, x, y):
         """综合点击：尝试多种方法"""
-        print(f"👆 点击: ({x}, {y})")
+        print(f"[TAP] Click: ({x}, {y})")
         
         # 方法1: input tap (基础)
         self._run(f"adb -s {self.device} shell input tap {x} {y}")
@@ -88,7 +88,7 @@ class SendEventController:
     
     def swipe(self, x1, y1, x2, y2, duration=500):
         """滑动"""
-        print(f"👆 滑动: ({x1},{y1}) -> ({x2},{y2})")
+        print(f"[SWIPE] ({x1},{y1}) -> ({x2},{y2})")
         
         # 分步滑动
         steps = duration // 20  # 每步20ms
@@ -113,7 +113,7 @@ class SendEventController:
     
     def screenshot(self, filename="screen.png"):
         """截图"""
-        print(f"📸 截图...")
+        print(f"[SCREEN] Screenshot...")
         self._run(f"adb -s {self.device} shell screencap -p /sdcard/{filename}")
         self._run(f"adb -s {self.device} pull /sdcard/{filename} {filename}")
         return os.path.exists(filename)
@@ -128,27 +128,27 @@ def test():
     controller = SendEventController()
     
     print("=" * 50)
-    print("🧪 sendevent 方案测试")
+    print("TEST: sendevent solution")
     print("=" * 50)
     
     controller.get_screen_size()
-    print(f"   屏幕: {controller.screen_size}")
+    print(f"   Screen: {controller.screen_size}")
     
     # 测试点击
-    print("\n1️⃣ 点击测试...")
+    print("\n1. Tap test...")
     w, h = controller.screen_size
     controller.tap(w // 2, h // 2)
     
     # 测试滑动
-    print("\n2️⃣ 滑动测试...")
+    print("\n2. Swipe test...")
     controller.swipe(w // 2, h - 200, w // 2, 200)
     
     # 测试截图
-    print("\n3️⃣ 截图测试...")
+    print("\n3. Screenshot test...")
     controller.screenshot()
     
     print("\n" + "=" * 50)
-    print("✅ 测试完成")
+    print("TEST: Completed")
     print("=" * 50)
 
 
